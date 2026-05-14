@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: knowledge-base
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn bz_project.wsgi:application
+    envVars:
+      - key: DEBUG
+        value: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.10.12
