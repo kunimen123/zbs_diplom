@@ -1,4 +1,4 @@
-FROM cirrusci/flutter:latest AS builder
+FROM ghcr.io/cirruslabs/flutter:stable AS builder
 WORKDIR /app
 COPY . .
 RUN flutter clean
