@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
           }
           
           // Админ -> на админ панель
-          if (authService.username == 'admin') {
+          if (authService.isStaff) {
             return const AdminDashboardScreen();
           }
           
