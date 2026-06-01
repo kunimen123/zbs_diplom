@@ -19,38 +19,7 @@ class AdminApiService {
     };
   }
 
-
-// Универсальный метод для пагинированных запросов
-  Future<Map<String, dynamic>> _getPaginated(String baseUrl, {String? nextUrl}) async {
-    final headers = await _getHeaders();
-    String url = nextUrl ?? baseUrl;
-    
-    // Если nextUrl — пустая строка, считаем что данных больше нет
-    if (url.isEmpty) {
-      return {
-        'items': [],
-        'next': null,
-        'previous': null,
-        'count': 0,
-      };
-    }
-    
-    final response = await http.get(Uri.parse(url), headers: headers);
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final next = data['next'];
-      return {
-        'items': data['results'] ?? [],
-        'next': (next != null && next != '') ? next : null,
-        'previous': data['previous'],
-        'count': data['count'],
-      };
-    }
-    throw Exception('Ошибка загрузки: ${response.statusCode}');
-  }
-
   // ========== КАТЕГОРИИ ==========
-  // Для форм (без пагинации)
   Future<List<dynamic>> getCategories() async {
     final headers = await _getHeaders();
     final response = await http.get(
@@ -62,11 +31,6 @@ class AdminApiService {
       return data['results'] ?? data;
     }
     throw Exception('Ошибка загрузки категорий');
-  }
-
-  // Для списка с пагинацией
-  Future<Map<String, dynamic>> getCategoriesPaginated({String? nextUrl}) async {
-    return _getPaginated('${AppConfig.baseUrl}/api/admin/categories/', nextUrl: nextUrl);
   }
 
   Future<Map<String, dynamic>> createCategory(String name) async {
@@ -101,7 +65,6 @@ class AdminApiService {
   }
 
   // ========== ТЕГИ ==========
-  // Для форм (без пагинации)
   Future<List<dynamic>> getTags() async {
     final headers = await _getHeaders();
     final response = await http.get(
@@ -113,11 +76,6 @@ class AdminApiService {
       return data['results'] ?? data;
     }
     throw Exception('Ошибка загрузки тегов');
-  }
-
-  // Для списка с пагинацией
-  Future<Map<String, dynamic>> getTagsPaginated({String? nextUrl}) async {
-    return _getPaginated('${AppConfig.baseUrl}/api/admin/tags/', nextUrl: nextUrl);
   }
 
   Future<Map<String, dynamic>> createTag(String name) async {
@@ -152,7 +110,6 @@ class AdminApiService {
   }
 
   // ========== ПОЛЬЗОВАТЕЛИ ==========
-  // Для форм (без пагинации)
   Future<List<dynamic>> getUsers() async {
     final headers = await _getHeaders();
     final response = await http.get(
@@ -166,11 +123,6 @@ class AdminApiService {
     throw Exception('Ошибка загрузки пользователей');
   }
 
-  // Для списка с пагинацией
-  Future<Map<String, dynamic>> getUsersPaginated({String? nextUrl}) async {
-    return _getPaginated('${AppConfig.baseUrl}/api/admin/users/', nextUrl: nextUrl);
-  }
-
   Future<Map<String, dynamic>> updateUserRole(int userId, bool isStaff) async {
     final headers = await _getHeaders();
     final response = await http.patch(
@@ -178,11 +130,24 @@ class AdminApiService {
       headers: headers,
       body: jsonEncode({'is_staff': isStaff}),
     );
+    print('📡 Обновление роли: статус ${response.statusCode}, ответ: ${response.body}');
     if (response.statusCode == 200) return jsonDecode(response.body);
-    throw Exception('Ошибка обновления роли');
+    throw Exception('Ошибка обновления роли: ${response.statusCode}');
   }
 
   // ========== СТАТЬИ ==========
+  Future<List<dynamic>> getArticles({bool? isPublished}) async {
+    final headers = await _getHeaders();
+    String url = '${AppConfig.baseUrl}/api/admin/articles/';
+    if (isPublished != null) url += '?is_published=$isPublished';
+    final response = await http.get(Uri.parse(url), headers: headers);
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['results'] ?? data;
+    }
+    throw Exception('Ошибка загрузки статей');
+  }
+
   Future<Map<String, dynamic>> getArticle(int id) async {
     final headers = await _getHeaders();
     final response = await http.get(
@@ -191,13 +156,6 @@ class AdminApiService {
     );
     if (response.statusCode == 200) return jsonDecode(response.body);
     throw Exception('Ошибка загрузки статьи');
-  }
-
-  Future<Map<String, dynamic>> getArticlesPaginated({bool? isPublished, String? nextUrl}) async {
-    if (nextUrl != null) return _getPaginated(nextUrl);
-    String url = '${AppConfig.baseUrl}/api/admin/articles/';
-    if (isPublished != null) url += '?is_published=$isPublished';
-    return _getPaginated(url);
   }
 
   Future<Map<String, dynamic>> createArticle(Map<String, dynamic> data) async {
@@ -242,34 +200,33 @@ class AdminApiService {
     throw Exception('Ошибка изменения статуса');
   }
 
-    // Загрузка изображения
+  // Загрузка изображения (работает на Web и мобильных)
   Future<Map<String, dynamic>> updateArticleImage(int articleId, XFile image) async {
-  final token = await _getToken();
-  if (token == null) throw Exception('Не авторизован');
-  
-  final request = http.MultipartRequest(
-    'PATCH',
-    Uri.parse('${AppConfig.baseUrl}/api/admin/articles/$articleId/'),
-  );
-  request.headers['Authorization'] = 'Token $token';
-  
-  // Универсальный способ для Web и мобильных
-  final bytes = await image.readAsBytes();
-  final multipartFile = http.MultipartFile.fromBytes(
-    'image',
-    bytes,
-    filename: image.name,
-  );
-  request.files.add(multipartFile);
-  
-  final response = await request.send();
-  final responseBody = await response.stream.bytesToString();
-  
-  if (response.statusCode == 200) {
-    return jsonDecode(responseBody);
+    final token = await _getToken();
+    if (token == null) throw Exception('Не авторизован');
+    
+    final request = http.MultipartRequest(
+      'PATCH',
+      Uri.parse('${AppConfig.baseUrl}/api/admin/articles/$articleId/'),
+    );
+    request.headers['Authorization'] = 'Token $token';
+    
+    final bytes = await image.readAsBytes();
+    final multipartFile = http.MultipartFile.fromBytes(
+      'image',
+      bytes,
+      filename: image.name,
+    );
+    request.files.add(multipartFile);
+    
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    
+    if (response.statusCode == 200) {
+      return jsonDecode(responseBody);
+    }
+    throw Exception('Ошибка загрузки изображения: ${response.statusCode} - $responseBody');
   }
-  throw Exception('Ошибка загрузки изображения: ${response.statusCode} - $responseBody');
-}
 
   // Удаление изображения
   Future<void> deleteArticleImage(int articleId) async {
@@ -282,6 +239,5 @@ class AdminApiService {
     if (response.statusCode != 200) {
       throw Exception('Ошибка удаления изображения');
     }
-  } 
+  }
 }
-
