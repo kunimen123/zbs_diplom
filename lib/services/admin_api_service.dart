@@ -19,16 +19,29 @@ class AdminApiService {
     };
   }
 
-  // Универсальный метод для пагинированных запросов
+
+// Универсальный метод для пагинированных запросов
   Future<Map<String, dynamic>> _getPaginated(String baseUrl, {String? nextUrl}) async {
     final headers = await _getHeaders();
-    final url = nextUrl ?? baseUrl;
+    String url = nextUrl ?? baseUrl;
+    
+    // Если nextUrl — пустая строка, считаем что данных больше нет
+    if (url.isEmpty) {
+      return {
+        'items': [],
+        'next': null,
+        'previous': null,
+        'count': 0,
+      };
+    }
+    
     final response = await http.get(Uri.parse(url), headers: headers);
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      final next = data['next'];
       return {
         'items': data['results'] ?? [],
-        'next': data['next'],
+        'next': (next != null && next != '') ? next : null,
         'previous': data['previous'],
         'count': data['count'],
       };
