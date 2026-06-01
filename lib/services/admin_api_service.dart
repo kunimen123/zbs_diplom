@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../config.dart';
-import 'dart:io';
+import 'package:cross_file/cross_file.dart'; 
 
 class AdminApiService {
   final _storage = const FlutterSecureStorage();
@@ -230,25 +230,33 @@ class AdminApiService {
   }
 
     // Загрузка изображения
-  Future<Map<String, dynamic>> updateArticleImage(int articleId, File image) async {
-    final token = await _getToken();
-    if (token == null) throw Exception('Не авторизован');
-    
-    final request = http.MultipartRequest(
-      'PATCH',
-      Uri.parse('${AppConfig.baseUrl}/api/admin/articles/$articleId/'),
-    );
-    request.headers['Authorization'] = 'Token $token';
-    request.files.add(await http.MultipartFile.fromPath('image', image.path));
-    
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    
-    if (response.statusCode == 200) {
-      return jsonDecode(responseBody);
-    }
-    throw Exception('Ошибка загрузки изображения: ${response.statusCode}');
+  Future<Map<String, dynamic>> updateArticleImage(int articleId, XFile image) async {
+  final token = await _getToken();
+  if (token == null) throw Exception('Не авторизован');
+  
+  final request = http.MultipartRequest(
+    'PATCH',
+    Uri.parse('${AppConfig.baseUrl}/api/admin/articles/$articleId/'),
+  );
+  request.headers['Authorization'] = 'Token $token';
+  
+  // Универсальный способ для Web и мобильных
+  final bytes = await image.readAsBytes();
+  final multipartFile = http.MultipartFile.fromBytes(
+    'image',
+    bytes,
+    filename: image.name,
+  );
+  request.files.add(multipartFile);
+  
+  final response = await request.send();
+  final responseBody = await response.stream.bytesToString();
+  
+  if (response.statusCode == 200) {
+    return jsonDecode(responseBody);
   }
+  throw Exception('Ошибка загрузки изображения: ${response.statusCode} - $responseBody');
+}
 
   // Удаление изображения
   Future<void> deleteArticleImage(int articleId) async {

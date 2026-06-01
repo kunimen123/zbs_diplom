@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import '../../services/admin_api_service.dart';
 import '../../config.dart';
 
@@ -30,9 +30,10 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
   List<dynamic> _users = [];
   bool _isLoading = true;
   
-  // ДЛЯ КАРТИНКИ
-  File? _selectedImage;
+  // ДЛЯ КАРТИНКИ (используем XFile)
+  XFile? _selectedImage;
   String? _existingImageUrl;
+  bool _isImageLoading = false;
   final ImagePicker _picker = ImagePicker();
 
   @override
@@ -63,7 +64,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
-        _selectedImage = File(image.path);
+        _selectedImage = image;  // ← XFile, не File
       });
     }
   }
@@ -117,6 +118,8 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     
+    setState(() => _isImageLoading = true);
+    
     final data = {
       'title': _titleController.text,
       'summary': _summaryController.text,
@@ -137,7 +140,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
           await _api.updateArticleImage(widget.articleId!, _selectedImage!);
         }
         
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья обновлена')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья обновлена'), backgroundColor: Colors.green));
       } else {
         // Создание
         final created = await _api.createArticle(data);
@@ -147,11 +150,13 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
           await _api.updateArticleImage(created['id'], _selectedImage!);
         }
         
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья создана')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья создана'), backgroundColor: Colors.green));
       }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isImageLoading = false);
     }
   }
 
@@ -188,17 +193,26 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                               style: TextStyle(fontWeight: FontWeight.bold),
                             ),
                           ),
-                          // Показываем выбранное новое изображение
-                          if (_selectedImage != null)
+                          if (_isImageLoading)
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Center(child: CircularProgressIndicator()),
+                            )
+                          else if (_selectedImage != null)
                             Stack(
                               children: [
                                 ClipRRect(
                                   borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                                  child: Image.file(
-                                    _selectedImage!,
+                                  child: Image.network(
+                                    _selectedImage!.path,
                                     height: 200,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      height: 200,
+                                      color: Colors.grey.shade200,
+                                      child: const Center(child: Icon(Icons.broken_image, size: 50)),
+                                    ),
                                   ),
                                 ),
                                 Positioned(
@@ -212,7 +226,6 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                                 ),
                               ],
                             )
-                          // Показываем существующее изображение (при редактировании)
                           else if (_existingImageUrl != null && _existingImageUrl!.isNotEmpty)
                             Stack(
                               children: [
@@ -241,7 +254,6 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                                 ),
                               ],
                             )
-                          // Кнопка выбора изображения
                           else
                             InkWell(
                               onTap: _pickImage,
@@ -288,7 +300,8 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                     TextFormField(
                       controller: _contentController,
                       decoration: const InputDecoration(labelText: 'Содержание'),
-                      maxLines: 10,
+                      maxLines: 15,
+                      minLines: 10,
                       validator: (v) => v == null || v.isEmpty ? 'Введите содержание' : null,
                     ),
                     const SizedBox(height: 16),
