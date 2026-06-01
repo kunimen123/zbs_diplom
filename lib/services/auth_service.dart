@@ -9,11 +9,13 @@ class AuthService with ChangeNotifier {
   String? _token;
   String? _username;
   bool _isStaff = false;
+  int? _userId;
 
   String? get token => _token;
   bool get isAuthenticated => _token != null;
   bool get isStaff => _isStaff;
   String? get username => _username;
+  int? get userId => _userId;
 
   Future<void> login(String username, String password) async {
     final response = await http.post(
@@ -27,21 +29,42 @@ class AuthService with ChangeNotifier {
       _token = data['token'];
       _username = username;
       
-      // ПРОСТО СОХРАНЯЕМ - если username "admin", значит админ
-      // Либо проверяем по硬коду
-      if (username == 'admin' || username == 'administrator') {
-        _isStaff = true;
-      } else {
-        _isStaff = false;
-      }
-      
       await _storage.write(key: 'auth_token', value: _token);
       await _storage.write(key: 'username', value: _username);
-      await _storage.write(key: 'is_staff', value: _isStaff.toString());
+      
+      // Загружаем реальный профиль с сервера
+      await _fetchProfile();
       
       notifyListeners();
     } else {
       throw Exception('Неверные учетные данные');
+    }
+  }
+
+  Future<void> _fetchProfile() async {
+    if (_token == null) return;
+    
+    final response = await http.get(
+      Uri.parse('${AppConfig.baseUrl}/api/profile/'),
+      headers: {'Authorization': 'Token $_token'},
+    );
+    
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      _userId = data['id'];
+      _username = data['username'];
+      _isStaff = data['is_staff'] ?? false;
+      
+      await _storage.write(key: 'user_id', value: _userId.toString());
+      await _storage.write(key: 'is_staff', value: _isStaff.toString());
+    } else {
+      // Если профиль не загрузился, проверяем через админский эндпоинт
+      final adminCheck = await http.get(
+        Uri.parse('${AppConfig.baseUrl}/api/admin/users/'),
+        headers: {'Authorization': 'Token $_token'},
+      );
+      _isStaff = adminCheck.statusCode == 200;
+      await _storage.write(key: 'is_staff', value: _isStaff.toString());
     }
   }
 
@@ -61,9 +84,11 @@ class AuthService with ChangeNotifier {
       _token = data['token'];
       _username = data['username'];
       _isStaff = false;
+      _userId = data['user_id'];
       
       await _storage.write(key: 'auth_token', value: _token);
       await _storage.write(key: 'username', value: _username);
+      await _storage.write(key: 'user_id', value: _userId.toString());
       await _storage.write(key: 'is_staff', value: 'false');
       
       notifyListeners();
@@ -77,8 +102,10 @@ class AuthService with ChangeNotifier {
     _token = null;
     _username = null;
     _isStaff = false;
+    _userId = null;
     await _storage.delete(key: 'auth_token');
     await _storage.delete(key: 'username');
+    await _storage.delete(key: 'user_id');
     await _storage.delete(key: 'is_staff');
     notifyListeners();
   }
@@ -92,6 +119,13 @@ class AuthService with ChangeNotifier {
       _token = storedToken;
       _username = storedUsername;
       _isStaff = storedIsStaff == 'true';
+      
+      // Проверяем актуальность прав
+      try {
+        await _fetchProfile();
+      } catch (e) {
+        // Если ошибка, оставляем сохранённые права
+      }
       notifyListeners();
     }
   }
