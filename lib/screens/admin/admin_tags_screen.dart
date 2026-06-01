@@ -58,7 +58,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
         setState(() {
           _tags = result['items'];
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'] != '';
           _isLoading = false;
         });
       }
@@ -73,7 +73,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     if (mounted) setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getTagsPaginated(nextUrl: _nextUrl);
@@ -81,7 +81,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
         setState(() {
           _tags.addAll(result['items']);
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'] != '';
           _isLoadingMore = false;
         });
       }
@@ -100,7 +100,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
           controller: _nameController,
           autofocus: true,
           decoration: const InputDecoration(
-            hintText: 'Любое название на русском',
+            hintText: 'Любое название',
             border: OutlineInputBorder(),
           ),
         ),
@@ -148,7 +148,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 198, 176, 238)),
             child: const Text('Сохранить'),
           ),
         ],

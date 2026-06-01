@@ -19,7 +19,7 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   String? _nextUrl;
   bool _hasMore = true;
   String? _error;
-  String _filterPublished = 'all'; // 'all', 'published', 'draft'
+  String _filterPublished = 'all';
 
   @override
   void initState() {
@@ -56,7 +56,7 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
       setState(() {
         _items = result['items'];
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'] != '';
         _isLoading = false;
       });
     } catch (e) {
@@ -68,14 +68,14 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getArticlesPaginated(nextUrl: _nextUrl);
       setState(() {
         _items.addAll(result['items']);
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'] != '';
         _isLoadingMore = false;
       });
     } catch (e) {

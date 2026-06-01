@@ -56,7 +56,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         setState(() {
           _items = result['items'];
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'] != '';
           _isLoading = false;
         });
       }
@@ -71,7 +71,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     if (mounted) setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getUsersPaginated(nextUrl: _nextUrl);
@@ -79,7 +79,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
         setState(() {
           _items.addAll(result['items']);
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'] != '';
           _isLoadingMore = false;
         });
       }
@@ -91,7 +91,6 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   Future<void> _toggleRole(dynamic user) async {
     final newStaff = !(user['is_staff'] ?? false);
     try {
-      // Пробуем PATCH, если не работает – используем PUT
       await _api.updateUserRole(user['id'], newStaff);
       if (mounted) {
         _loadData();

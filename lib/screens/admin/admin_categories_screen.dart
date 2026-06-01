@@ -55,7 +55,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
       setState(() {
         _items = result['items'];
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'] != '';
         _isLoading = false;
       });
     } catch (e) {
@@ -67,14 +67,14 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getCategoriesPaginated(nextUrl: _nextUrl);
       setState(() {
         _items.addAll(result['items']);
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'] != '';
         _isLoadingMore = false;
       });
     } catch (e) {
