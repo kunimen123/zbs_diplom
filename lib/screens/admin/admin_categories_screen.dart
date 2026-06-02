@@ -52,13 +52,16 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     });
     try {
       final result = await _api.getCategoriesPaginated();
+      print('🔍 _loadData: next = ${result['next']}');
       setState(() {
         _items = result['items'];
         _nextUrl = result['next'];
         _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoading = false;
       });
+      print('✅ _hasMore = $_hasMore, _nextUrl = $_nextUrl');
     } catch (e) {
+      print('❌ Ошибка: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -68,16 +71,20 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
 
   Future<void> _loadMore() async {
     if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
+    print('🔍 _loadMore: nextUrl = $_nextUrl');
     setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getCategoriesPaginated(nextUrl: _nextUrl);
+      print('🔍 _loadMore result: next = ${result['next']}');
       setState(() {
         _items.addAll(result['items']);
         _nextUrl = result['next'];
         _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoadingMore = false;
       });
+      print('✅ После загрузки: _hasMore = $_hasMore, _nextUrl = $_nextUrl');
     } catch (e) {
+      print('❌ Ошибка _loadMore: $e');
       setState(() => _isLoadingMore = false);
     }
   }
