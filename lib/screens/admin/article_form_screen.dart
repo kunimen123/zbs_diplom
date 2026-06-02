@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:cross_file/cross_file.dart';
 import '../../services/admin_api_service.dart';
 import '../../config.dart';
 
@@ -30,7 +29,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
   List<dynamic> _users = [];
   bool _isLoading = true;
   
-  // ДЛЯ КАРТИНКИ (используем XFile)
+  // Для картинки
   XFile? _selectedImage;
   String? _existingImageUrl;
   bool _isImageLoading = false;
@@ -64,7 +63,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
-        _selectedImage = image;  // ← XFile, не File
+        _selectedImage = image;
       });
     }
   }
@@ -132,24 +131,16 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
     
     try {
       if (widget.articleId != null) {
-        // Обновление
         await _api.updateArticle(widget.articleId!, data);
-        
-        // Обновление картинки если выбрана новая
         if (_selectedImage != null) {
           await _api.updateArticleImage(widget.articleId!, _selectedImage!);
         }
-        
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья обновлена'), backgroundColor: Colors.green));
       } else {
-        // Создание
         final created = await _api.createArticle(data);
-        
-        // Если есть картинка - загружаем
         if (_selectedImage != null && created['id'] != null) {
           await _api.updateArticleImage(created['id'], _selectedImage!);
         }
-        
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Статья создана'), backgroundColor: Colors.green));
       }
       if (mounted) Navigator.pop(context, true);
@@ -176,7 +167,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // ===== БЛОК КАРТИНКИ =====
+                    // Блок изображения
                     Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
@@ -188,10 +179,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                         children: [
                           const Padding(
                             padding: EdgeInsets.all(12),
-                            child: Text(
-                              'Изображение статьи',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
+                            child: Text('Изображение статьи', style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                           if (_isImageLoading)
                             const Padding(
@@ -208,7 +196,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                                     height: 200,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
+                                    errorBuilder: (_, _, _) => Container(
                                       height: 200,
                                       color: Colors.grey.shade200,
                                       child: const Center(child: Icon(Icons.broken_image, size: 50)),
@@ -236,7 +224,7 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                                     height: 200,
                                     width: double.infinity,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
+                                    errorBuilder: (_, _, _) => Container(
                                       height: 200,
                                       color: Colors.grey.shade200,
                                       child: const Center(child: Icon(Icons.broken_image, size: 50)),
@@ -266,25 +254,18 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                                   children: [
                                     Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade600),
                                     const SizedBox(height: 8),
-                                    Text(
-                                      'Нажмите для выбора изображения',
-                                      style: TextStyle(color: Colors.grey.shade600),
-                                    ),
+                                    Text('Нажмите для выбора изображения', style: TextStyle(color: Colors.grey.shade600)),
                                   ],
                                 ),
                               ),
                             ),
                           Padding(
                             padding: const EdgeInsets.all(12),
-                            child: Text(
-                              'Рекомендуемый размер: 1200x600px',
-                              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                            ),
+                            child: Text('Рекомендуемый размер: 1200x600px', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                           ),
                         ],
                       ),
                     ),
-                    // ===== ОСТАЛЬНЫЕ ПОЛЯ =====
                     TextFormField(
                       controller: _titleController,
                       decoration: const InputDecoration(labelText: 'Заголовок'),
@@ -326,11 +307,8 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                             selected: isSelected,
                             onSelected: (selected) {
                               setState(() {
-                                if (selected) {
-                                  _selectedTags.add(tag['id']);
-                                } else {
-                                  _selectedTags.remove(tag['id']);
-                                }
+                                if (selected) _selectedTags.add(tag['id']);
+                                else _selectedTags.remove(tag['id']);
                               });
                             },
                           );
@@ -349,11 +327,8 @@ class _ArticleFormScreenState extends State<ArticleFormScreen> {
                             selected: isSelected,
                             onSelected: (selected) {
                               setState(() {
-                                if (selected) {
-                                  _selectedEditors.add(user['id']);
-                                } else {
-                                  _selectedEditors.remove(user['id']);
-                                }
+                                if (selected) _selectedEditors.add(user['id']);
+                                else _selectedEditors.remove(user['id']);
                               });
                             },
                           );

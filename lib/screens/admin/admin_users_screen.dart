@@ -10,33 +10,81 @@ class AdminUsersScreen extends StatefulWidget {
 
 class _AdminUsersScreenState extends State<AdminUsersScreen> {
   final AdminApiService _api = AdminApiService();
+  final ScrollController _scrollController = ScrollController();
 
   List<dynamic> _items = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  String? _nextUrl;
+  bool _hasMore = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMore && !_isLoading) {
+        _loadMore();
+      }
+    }
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+        _items = [];
+        _nextUrl = null;
+        _hasMore = true;
+      });
+    }
     try {
-      final items = await _api.getUsers(); // Без пагинации
-      setState(() {
-        _items = items;
-        _isLoading = false;
-      });
+      final result = await _api.getUsersPaginated();
+      if (mounted) {
+        setState(() {
+          _items = result['items'];
+          _nextUrl = result['next'];
+          _hasMore = result['next'] != null;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_nextUrl == null || _isLoadingMore) return;
+    if (mounted) setState(() => _isLoadingMore = true);
+    try {
+      final result = await _api.getUsersPaginated(nextUrl: _nextUrl);
+      if (mounted) {
+        setState(() {
+          _items.addAll(result['items']);
+          _nextUrl = result['next'];
+          _hasMore = result['next'] != null;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -78,9 +126,16 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
               : _items.isEmpty
                   ? const Center(child: Text('Нет пользователей'))
                   : ListView.builder(
+                      controller: _scrollController,
                       padding: const EdgeInsets.all(12),
-                      itemCount: _items.length,
+                      itemCount: _items.length + (_hasMore ? 1 : 0),
                       itemBuilder: (ctx, i) {
+                        if (i == _items.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          );
+                        }
                         final user = _items[i];
                         return Card(
                           child: ListTile(
@@ -93,6 +148,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                             trailing: Switch(
                               value: user['is_staff'] ?? false,
                               onChanged: (_) => _toggleRole(user),
+                              activeTrackColor: Colors.deepPurple.shade100,
                               activeColor: Colors.deepPurple,
                             ),
                           ),

@@ -10,40 +10,83 @@ class AdminTagsScreen extends StatefulWidget {
 
 class _AdminTagsScreenState extends State<AdminTagsScreen> {
   final AdminApiService _api = AdminApiService();
+  final ScrollController _scrollController = ScrollController();
   final TextEditingController _nameController = TextEditingController();
 
   List<dynamic> _tags = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  String? _nextUrl;
+  bool _hasMore = true;
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _nameController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMore && !_isLoading) {
+        _loadMore();
+      }
+    }
+  }
+
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+        _tags = [];
+        _nextUrl = null;
+        _hasMore = true;
+      });
+    }
     try {
-      final tags = await _api.getTags(); // Без пагинации
-      setState(() {
-        _tags = tags;
-        _isLoading = false;
-      });
+      final result = await _api.getTagsPaginated();
+      if (mounted) {
+        setState(() {
+          _tags = result['items'];
+          _nextUrl = result['next'];
+          _hasMore = result['next'] != null;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_nextUrl == null || _isLoadingMore) return;
+    if (mounted) setState(() => _isLoadingMore = true);
+    try {
+      final result = await _api.getTagsPaginated(nextUrl: _nextUrl);
+      if (mounted) {
+        setState(() {
+          _tags.addAll(result['items']);
+          _nextUrl = result['next'];
+          _hasMore = result['next'] != null;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMore = false);
     }
   }
 
@@ -67,10 +110,18 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
     if (result == true && _nameController.text.trim().isNotEmpty) {
       try {
         await _api.createTag(_nameController.text.trim());
-        _loadData();
-        _showSnackBar('Тег создан', Colors.green);
+        if (mounted) {
+          _loadData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Тег создан'), backgroundColor: Colors.green),
+          );
+        }
       } catch (e) {
-        _showSnackBar('Ошибка: $e', Colors.red);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -91,10 +142,18 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
     if (result == true && _nameController.text.trim().isNotEmpty && _nameController.text.trim() != tag['name']) {
       try {
         await _api.updateTag(tag['id'], _nameController.text.trim());
-        _loadData();
-        _showSnackBar('Тег обновлён', Colors.green);
+        if (mounted) {
+          _loadData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Тег обновлён'), backgroundColor: Colors.green),
+          );
+        }
       } catch (e) {
-        _showSnackBar('Ошибка: $e', Colors.red);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -107,23 +166,30 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
         content: Text('Тег "$name" будет удалён.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Удалить', style: TextStyle(color: Colors.red))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+          ),
         ],
       ),
     );
     if (confirm == true) {
       try {
         await _api.deleteTag(id);
-        _loadData();
-        _showSnackBar('Тег удалён', Colors.green);
+        if (mounted) {
+          _loadData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Тег удалён'), backgroundColor: Colors.green),
+          );
+        }
       } catch (e) {
-        _showSnackBar('Ошибка: $e', Colors.red);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
-  }
-
-  void _showSnackBar(String msg, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: color));
   }
 
   @override
@@ -140,11 +206,34 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
           : _errorMessage != null
               ? Center(child: Text('Ошибка: $_errorMessage'))
               : _tags.isEmpty
-                  ? Center(child: Text('Нет тегов'))
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.local_offer_outlined, size: 64, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text('Нет тегов'),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _createTag,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Создать тег'),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                          ),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
+                      controller: _scrollController,
                       padding: const EdgeInsets.all(12),
-                      itemCount: _tags.length,
+                      itemCount: _tags.length + (_hasMore ? 1 : 0),
                       itemBuilder: (context, index) {
+                        if (index == _tags.length) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          );
+                        }
                         final tag = _tags[index];
                         return Card(
                           child: ListTile(

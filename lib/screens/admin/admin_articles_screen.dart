@@ -11,9 +11,13 @@ class AdminArticlesScreen extends StatefulWidget {
 
 class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   final AdminApiService _api = AdminApiService();
+  final ScrollController _scrollController = ScrollController();
 
   List<dynamic> _items = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  String? _nextUrl;
+  bool _hasMore = true;
   String? _error;
   String _filterPublished = 'all';
 
@@ -21,18 +25,38 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMore && !_isLoading) {
+        _loadMore();
+      }
+    }
   }
 
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
       _error = null;
+      _items = [];
+      _nextUrl = null;
+      _hasMore = true;
     });
     try {
       final bool? isPublished = _filterPublished == 'all' ? null : (_filterPublished == 'published');
-      final items = await _api.getArticles(isPublished: isPublished); // Без пагинации
+      final result = await _api.getArticlesPaginated(isPublished: isPublished);
       setState(() {
-        _items = items;
+        _items = result['items'];
+        _nextUrl = result['next'];
+        _hasMore = result['next'] != null;
         _isLoading = false;
       });
     } catch (e) {
@@ -40,6 +64,22 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
         _error = e.toString();
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_nextUrl == null || _isLoadingMore) return;
+    setState(() => _isLoadingMore = true);
+    try {
+      final result = await _api.getArticlesPaginated(nextUrl: _nextUrl);
+      setState(() {
+        _items.addAll(result['items']);
+        _nextUrl = result['next'];
+        _hasMore = result['next'] != null;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingMore = false);
     }
   }
 
@@ -115,9 +155,16 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
                     : _items.isEmpty
                         ? const Center(child: Text('Нет статей'))
                         : ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.all(12),
-                            itemCount: _items.length,
+                            itemCount: _items.length + (_hasMore ? 1 : 0),
                             itemBuilder: (ctx, i) {
+                              if (i == _items.length) {
+                                return const Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                );
+                              }
                               final art = _items[i];
                               return Card(
                                 child: ListTile(
