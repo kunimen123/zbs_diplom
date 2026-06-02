@@ -24,7 +24,6 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -32,20 +31,6 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     _scrollController.dispose();
     _nameController.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    final position = _scrollController.position;
-    final maxScroll = position.maxScrollExtent;
-    final currentScroll = position.pixels;
-    final threshold = maxScroll - 200;
-    
-    print('📜 Скролл: currentScroll=$currentScroll, maxScroll=$maxScroll, threshold=$threshold');
-    
-    if (currentScroll >= threshold && !_isLoadingMore && _hasMore && !_isLoading) {
-      print('🚀 Загрузка больше...');
-      _loadMore();
-    }
   }
 
   Future<void> _loadData() async {
@@ -58,16 +43,13 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
     });
     try {
       final result = await _api.getCategoriesPaginated();
-      print('🔍 _loadData: next = ${result['next']}');
       setState(() {
         _items = result['items'];
         _nextUrl = result['next'];
         _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoading = false;
       });
-      print('✅ _hasMore = $_hasMore, _nextUrl = $_nextUrl');
     } catch (e) {
-      print('❌ Ошибка: $e');
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -76,24 +58,17 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) {
-      print('⚠️ Пропуск _loadMore: nextUrl пустой или уже загружается');
-      return;
-    }
-    print('🔍 _loadMore: nextUrl = $_nextUrl');
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getCategoriesPaginated(nextUrl: _nextUrl);
-      print('🔍 _loadMore result: next = ${result['next']}');
       setState(() {
         _items.addAll(result['items']);
         _nextUrl = result['next'];
         _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoadingMore = false;
       });
-      print('✅ После загрузки: _hasMore = $_hasMore, _nextUrl = $_nextUrl');
     } catch (e) {
-      print('❌ Ошибка _loadMore: $e');
       setState(() => _isLoadingMore = false);
     }
   }
@@ -188,45 +163,46 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
               ? Center(child: Text('Ошибка: $_error'))
               : _items.isEmpty
                   ? const Center(child: Text('Нет категорий'))
-                  : NotificationListener<ScrollNotification>(
-                      onNotification: (notification) {
-                        if (notification is ScrollEndNotification) {
-                          final position = _scrollController.position;
-                          if (position.pixels >= position.maxScrollExtent - 200) {
-                            if (!_isLoadingMore && _hasMore && !_isLoading) {
-                              _loadMore();
-                            }
-                          }
-                        }
-                        return false;
-                      },
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _items.length + (_hasMore ? 1 : 0),
-                        itemBuilder: (ctx, i) {
-                          if (i == _items.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            );
-                          }
-                          final item = _items[i];
-                          return Card(
-                            child: ListTile(
-                              leading: const Icon(Icons.category, color: Colors.deepPurple),
-                              title: Text(item['name']),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _edit(item)),
-                                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _delete(item['id'], item['name'])),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.all(12),
+                            itemCount: _items.length,
+                            itemBuilder: (ctx, i) {
+                              final item = _items[i];
+                              return Card(
+                                child: ListTile(
+                                  leading: const Icon(Icons.category, color: Colors.deepPurple),
+                                  title: Text(item['name']),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _edit(item)),
+                                      IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _delete(item['id'], item['name'])),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        if (_hasMore)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: _isLoadingMore
+                                ? const CircularProgressIndicator()
+                                : ElevatedButton(
+                                    onPressed: _loadMore,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.deepPurple,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Загрузить ещё'),
+                                  ),
+                          ),
+                      ],
                     ),
       floatingActionButton: FloatingActionButton(
         onPressed: _create,
