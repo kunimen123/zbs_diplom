@@ -35,10 +35,16 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (!_isLoadingMore && _hasMore && !_isLoading) {
-        _loadMore();
-      }
+    final position = _scrollController.position;
+    final maxScroll = position.maxScrollExtent;
+    final currentScroll = position.pixels;
+    final threshold = maxScroll - 200;
+    
+    print('📜 Скролл: currentScroll=$currentScroll, maxScroll=$maxScroll, threshold=$threshold');
+    
+    if (currentScroll >= threshold && !_isLoadingMore && _hasMore && !_isLoading) {
+      print('🚀 Загрузка больше...');
+      _loadMore();
     }
   }
 
@@ -70,7 +76,10 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) {
+      print('⚠️ Пропуск _loadMore: nextUrl пустой или уже загружается');
+      return;
+    }
     print('🔍 _loadMore: nextUrl = $_nextUrl');
     setState(() => _isLoadingMore = true);
     try {
@@ -179,32 +188,45 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
               ? Center(child: Text('Ошибка: $_error'))
               : _items.isEmpty
                   ? const Center(child: Text('Нет категорий'))
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(12),
-                      itemCount: _items.length + (_hasMore ? 1 : 0),
-                      itemBuilder: (ctx, i) {
-                        if (i == _items.length) {
-                          return const Padding(
-                            padding: EdgeInsets.all(16),
-                            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          );
+                  : NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification is ScrollEndNotification) {
+                          final position = _scrollController.position;
+                          if (position.pixels >= position.maxScrollExtent - 200) {
+                            if (!_isLoadingMore && _hasMore && !_isLoading) {
+                              _loadMore();
+                            }
+                          }
                         }
-                        final item = _items[i];
-                        return Card(
-                          child: ListTile(
-                            leading: const Icon(Icons.category, color: Colors.deepPurple),
-                            title: Text(item['name']),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _edit(item)),
-                                IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _delete(item['id'], item['name'])),
-                              ],
-                            ),
-                          ),
-                        );
+                        return false;
                       },
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: _items.length + (_hasMore ? 1 : 0),
+                        itemBuilder: (ctx, i) {
+                          if (i == _items.length) {
+                            return const Padding(
+                              padding: EdgeInsets.all(16),
+                              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            );
+                          }
+                          final item = _items[i];
+                          return Card(
+                            child: ListTile(
+                              leading: const Icon(Icons.category, color: Colors.deepPurple),
+                              title: Text(item['name']),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(icon: const Icon(Icons.edit, color: Colors.blue), onPressed: () => _edit(item)),
+                                  IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _delete(item['id'], item['name'])),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
       floatingActionButton: FloatingActionButton(
         onPressed: _create,
