@@ -11,7 +11,6 @@ class AdminArticlesScreen extends StatefulWidget {
 
 class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   final AdminApiService _api = AdminApiService();
-  final ScrollController _scrollController = ScrollController();
 
   List<dynamic> _items = [];
   bool _isLoading = true;
@@ -25,21 +24,6 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   void initState() {
     super.initState();
     _loadData();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (!_isLoadingMore && _hasMore && !_isLoading) {
-        _loadMore();
-      }
-    }
   }
 
   Future<void> _loadData() async {
@@ -154,50 +138,63 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
                     ? Center(child: Text('Ошибка: $_error'))
                     : _items.isEmpty
                         ? const Center(child: Text('Нет статей'))
-                        : ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(12),
-                            itemCount: _items.length + (_hasMore ? 1 : 0),
-                            itemBuilder: (ctx, i) {
-                              if (i == _items.length) {
-                                return const Padding(
-                                  padding: EdgeInsets.all(16),
-                                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                                );
-                              }
-                              final art = _items[i];
-                              return Card(
-                                child: ListTile(
-                                  leading: Icon(
-                                    art['is_published'] ? Icons.public : Icons.drafts,
-                                    color: art['is_published'] ? Colors.green : Colors.orange,
-                                  ),
-                                  title: Text(art['title'] ?? 'Без названия'),
-                                  subtitle: Text('Автор: ${art['author_detail']?['username'] ?? '?'}'),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: Icon(art['is_published'] ? Icons.visibility_off : Icons.visibility),
-                                        onPressed: () => _togglePublish(art['id'], art['is_published']),
-                                        tooltip: art['is_published'] ? 'Снять с публикации' : 'Опубликовать',
+                        : Column(
+                            children: [
+                              Expanded(
+                                child: ListView.builder(
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: _items.length,
+                                  itemBuilder: (ctx, i) {
+                                    final art = _items[i];
+                                    return Card(
+                                      child: ListTile(
+                                        leading: Icon(
+                                          art['is_published'] ? Icons.public : Icons.drafts,
+                                          color: art['is_published'] ? Colors.green : Colors.orange,
+                                        ),
+                                        title: Text(art['title'] ?? 'Без названия'),
+                                        subtitle: Text('Автор: ${art['author_detail']?['username'] ?? '?'}'),
+                                        trailing: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IconButton(
+                                              icon: Icon(art['is_published'] ? Icons.visibility_off : Icons.visibility),
+                                              onPressed: () => _togglePublish(art['id'], art['is_published']),
+                                              tooltip: art['is_published'] ? 'Снять с публикации' : 'Опубликовать',
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.edit, color: Colors.blue),
+                                              onPressed: () async {
+                                                await Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleFormScreen(articleId: art['id'])));
+                                                _loadData();
+                                              },
+                                            ),
+                                            IconButton(
+                                              icon: const Icon(Icons.delete, color: Colors.red),
+                                              onPressed: () => _deleteArticle(art['id'], art['title']),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.edit, color: Colors.blue),
-                                        onPressed: () async {
-                                          await Navigator.push(context, MaterialPageRoute(builder: (_) => ArticleFormScreen(articleId: art['id'])));
-                                          _loadData();
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () => _deleteArticle(art['id'], art['title']),
-                                      ),
-                                    ],
-                                  ),
+                                    );
+                                  },
                                 ),
-                              );
-                            },
+                              ),
+                              if (_hasMore)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  child: _isLoadingMore
+                                      ? const CircularProgressIndicator()
+                                      : ElevatedButton(
+                                          onPressed: _loadMore,
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.deepPurple,
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          child: const Text('Загрузить ещё'),
+                                        ),
+                                ),
+                            ],
                           ),
           ),
         ],
