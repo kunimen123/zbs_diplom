@@ -56,7 +56,7 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
       setState(() {
         _items = result['items'];
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoading = false;
       });
     } catch (e) {
@@ -75,7 +75,7 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
       setState(() {
         _items.addAll(result['items']);
         _nextUrl = result['next'];
-        _hasMore = result['next'] != null;
+        _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
         _isLoadingMore = false;
       });
     } catch (e) {

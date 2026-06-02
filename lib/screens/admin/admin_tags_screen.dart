@@ -58,7 +58,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
         setState(() {
           _tags = result['items'];
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
           _isLoading = false;
         });
       }
@@ -81,7 +81,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
         setState(() {
           _tags.addAll(result['items']);
           _nextUrl = result['next'];
-          _hasMore = result['next'] != null;
+          _hasMore = result['next'] != null && result['next'].toString().isNotEmpty;
           _isLoadingMore = false;
         });
       }
