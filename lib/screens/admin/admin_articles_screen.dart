@@ -68,7 +68,7 @@ class _AdminArticlesScreenState extends State<AdminArticlesScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getArticlesPaginated(nextUrl: _nextUrl);

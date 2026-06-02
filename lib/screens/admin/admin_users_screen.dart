@@ -71,7 +71,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     if (mounted) setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getUsersPaginated(nextUrl: _nextUrl);
@@ -149,7 +149,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                               value: user['is_staff'] ?? false,
                               onChanged: (_) => _toggleRole(user),
                               activeTrackColor: Colors.deepPurple.shade100,
-                              activeColor: Colors.deepPurple,
+                              activeThumbColor: Colors.deepPurple,
                             ),
                           ),
                         );

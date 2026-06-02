@@ -73,7 +73,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_nextUrl == null || _isLoadingMore) return;
+    if (_nextUrl == null || _nextUrl!.isEmpty || _isLoadingMore) return;
     if (mounted) setState(() => _isLoadingMore = true);
     try {
       final result = await _api.getTagsPaginated(nextUrl: _nextUrl);
@@ -168,8 +168,7 @@ class _AdminTagsScreenState extends State<AdminTagsScreen> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Отмена')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Удалить', style: TextStyle(color: Colors.red)),
-          ),
+            child: const Text('Удалить', style: TextStyle(color: Colors.red))),
         ],
       ),
     );
