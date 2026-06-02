@@ -30,6 +30,7 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
   String _searchQuery = '';
   int? _selectedTagId;
   bool _showMyArticles = false;
+  bool _showFavorites = false;
   List<dynamic> _tags = [];
 
   @override
@@ -82,7 +83,9 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
     
     try {
       String url;
-      if (_showMyArticles && authService.isAuthenticated) {
+      if (_showFavorites && authService.isAuthenticated) {
+        url = '${AppConfig.baseUrl}/api/articles/favorites/';
+      } else if (_showMyArticles && authService.isAuthenticated) {
         url = '${AppConfig.baseUrl}/api/articles/my_articles/';
       } else {
         url = '${AppConfig.baseUrl}/api/articles/';
@@ -149,6 +152,49 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
     }
   }
 
+  Future<void> _toggleFavorite(int articleId, bool isFavorited) async {
+    final token = await _getToken();
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Войдите, чтобы добавлять в избранное'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    
+    final headers = await _getHeaders();
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.baseUrl}/api/articles/$articleId/favorite/'),
+        headers: headers,
+      );
+      if (response.statusCode == 200) {
+        // Обновляем локальное состояние
+        setState(() {
+          final index = _articles.indexWhere((a) => a['id'] == articleId);
+          if (index != -1) {
+            _articles[index]['is_favorited'] = !isFavorited;
+            if (!isFavorited) {
+              _articles[index]['favorites_count'] = (_articles[index]['favorites_count'] ?? 0) + 1;
+            } else {
+              _articles[index]['favorites_count'] = (_articles[index]['favorites_count'] ?? 0) - 1;
+            }
+          }
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isFavorited ? 'Удалено из избранного' : 'Добавлено в избранное'),
+            backgroundColor: isFavorited ? Colors.orange : Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ошибка'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   void _onSearch(String query) {
     _searchQuery = query;
     _loadData();
@@ -161,7 +207,26 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
 
   void _toggleMyArticles() {
     setState(() {
-      _showMyArticles = !_showMyArticles;
+      _showMyArticles = true;
+      _showFavorites = false;
+    });
+    _loadData();
+  }
+
+  void _toggleFavorites() {
+    setState(() {
+      _showFavorites = true;
+      _showMyArticles = false;
+    });
+    _loadData();
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _showMyArticles = false;
+      _showFavorites = false;
+      _searchQuery = '';
+      _selectedTagId = null;
     });
     _loadData();
   }
@@ -215,6 +280,15 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                 decoration: InputDecoration(
                   hintText: 'Поиск статей...',
                   prefixIcon: const Icon(Icons.search, color: Colors.deepPurple),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, color: Colors.grey),
+                          onPressed: () {
+                            _searchQuery = '';
+                            _loadData();
+                          },
+                        )
+                      : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(30),
                     borderSide: BorderSide.none,
@@ -239,6 +313,17 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                     backgroundColor: Colors.white,
                     selectedColor: Colors.deepPurple.shade100,
                     checkmarkColor: Colors.deepPurple,
+                  ),
+                if (authService.isAuthenticated)
+                  const SizedBox(width: 8),
+                if (authService.isAuthenticated)
+                  FilterChip(
+                    label: const Text('Избранное'),
+                    selected: _showFavorites,
+                    onSelected: (_) => _toggleFavorites(),
+                    backgroundColor: Colors.white,
+                    selectedColor: Colors.red.shade100,
+                    checkmarkColor: Colors.red,
                   ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -277,6 +362,12 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                     ),
                   ),
                 ),
+                if (_showMyArticles || _showFavorites || _searchQuery.isNotEmpty || _selectedTagId != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear_all, color: Colors.deepPurple),
+                    onPressed: _clearFilters,
+                    tooltip: 'Сбросить фильтры',
+                  ),
               ],
             ),
           ),
@@ -297,7 +388,28 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                         ),
                       )
                     : _articles.isEmpty
-                        ? const Center(child: Text('Нет статей'))
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (_showFavorites)
+                                  const Icon(Icons.favorite_border, size: 64, color: Colors.grey),
+                                if (_showMyArticles)
+                                  const Icon(Icons.article_outlined, size: 64, color: Colors.grey),
+                                if (!_showMyArticles && !_showFavorites)
+                                  const Icon(Icons.article_outlined, size: 64, color: Colors.grey),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _showFavorites
+                                      ? 'Нет избранных статей'
+                                      : _showMyArticles
+                                          ? 'У вас нет статей'
+                                          : 'Нет статей',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
                         : ListView.builder(
                             controller: _scrollController,
                             padding: const EdgeInsets.all(12),
@@ -313,6 +425,8 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                               final tagNames = (article['tags_detail'] as List<dynamic>?)
                                   ?.map((t) => t['name'] as String)
                                   .toList() ?? [];
+                              final isFavorited = article['is_favorited'] ?? false;
+                              
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 elevation: 2,
@@ -341,7 +455,14 @@ class _ArticleListScreenState extends State<ArticleListScreen> {
                                             const SizedBox(width: 4),
                                             Expanded(child: Text(article['author_detail']?['username'] ?? 'Автор', style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
                                             const SizedBox(width: 12),
-                                            Icon(Icons.favorite_border, size: 14, color: Colors.grey.shade500),
+                                            GestureDetector(
+                                              onTap: () => _toggleFavorite(article['id'], isFavorited),
+                                              child: Icon(
+                                                isFavorited ? Icons.favorite : Icons.favorite_border,
+                                                size: 14,
+                                                color: isFavorited ? Colors.red : Colors.grey.shade500,
+                                              ),
+                                            ),
                                             const SizedBox(width: 4),
                                             Text('${article['favorites_count'] ?? 0}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
                                             const SizedBox(width: 12),
