@@ -11,3 +11,5 @@ services:
         generateValue: true
       - key: PYTHON_VERSION
         value: 3.10.12
+      - key: DATABASE_URL
+        value: postgresql://zbs_user:пароль@dpg-...-a/k_db_as1t  # НОВАЯ ССЫЛКА
