@@ -2,7 +2,10 @@ services:
   - type: web
     name: knowledge-base
     runtime: python
-    buildCommand: pip install -r requirements.txt
+    buildCommand: |
+      pip install -r requirements.txt
+      python manage.py migrate
+      python manage.py loaddata datadump.json
     startCommand: gunicorn bz_project.wsgi:application
     envVars:
       - key: DEBUG
@@ -12,4 +15,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.12
       - key: DATABASE_URL
-        value: postgresql://base_user:7V29YI03tZC6jK47nQOeXlBiWPmnwgyv@dpg-d8ufa4tckfvc73f4hkvg-a.oregon-postgres.render.com/base_db_vqgs
+        value: postgresql://base_user:7V29YI03tZC6jK47nQOeXlBiWPmnwgyv@dpg-d8ufa4tckfvc73f4hkvg-a/base_db_vqgs
